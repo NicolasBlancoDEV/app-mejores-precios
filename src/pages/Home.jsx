@@ -2,6 +2,7 @@ import { useContext, useState, useEffect } from 'react';
 import { ProductContext } from '../context/ProductContext';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { FaShoppingCart } from 'react-icons/fa';
+import { format } from 'date-fns';
 
 // Variantes para el spinner de carga
 const spinnerVariants = {
@@ -27,13 +28,38 @@ const pulseVariants = {
   },
 };
 
-// Variantes para las tarjetas
-const cardVariants = {
-  hidden: { opacity: 0, scale: 0.8 },
-  visible: {
+// Variantes para el efecto Float de los productos
+const floatVariants = {
+  animate: {
+    y: [0, -10, 0],
+    transition: {
+      repeat: Infinity,
+      duration: 3,
+      ease: 'easeInOut',
+    },
+  },
+};
+
+// Variantes para la entrada de los productos (Slide In + Fade In)
+const productVariants = {
+  hidden: { opacity: 0, y: 50 },
+  visible: (i) => ({
     opacity: 1,
-    scale: 1,
-    transition: { duration: 0.5, ease: 'easeInOut' },
+    y: 0,
+    transition: {
+      delay: i * 0.1, // Retraso para que entren uno por uno
+      duration: 0.5,
+      ease: 'easeInOut',
+    },
+  }),
+};
+
+// Variantes para el botón (Hover Lift)
+const buttonVariants = {
+  hover: {
+    y: -5,
+    boxShadow: '0 5px 15px rgba(59, 130, 246, 0.4)',
+    transition: { duration: 0.3 },
   },
 };
 
@@ -138,9 +164,9 @@ function Home() {
           </motion.div>
         ) : (
           <>
-            {/* Barra de búsqueda con Fade In */}
+            {/* Barra de búsqueda con Fade In, ajustada para estar más cerca del navbar */}
             <motion.div
-              className="container mx-auto mb-6 mt-20"
+              className="container mx-auto mb-6 mt-6"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5, ease: 'easeInOut' }}
@@ -158,11 +184,11 @@ function Home() {
               </div>
             </motion.div>
 
-            {/* Resultados en Masonry Grid */}
+            {/* Productos en Masonry Grid, sin cards */}
             <div className="container mx-auto">
               {displayedProducts.length > 0 ? (
                 <div className="columns-1 md:columns-3 gap-4 space-y-4">
-                  {displayedProducts.map((product) => {
+                  {displayedProducts.map((product, index) => {
                     const isCheapest =
                       cheapestProducts[product.name.toLowerCase()] &&
                       cheapestProducts[product.name.toLowerCase()].id === product.id;
@@ -170,22 +196,30 @@ function Home() {
                     return (
                       <motion.div
                         key={product.id}
-                        className={`p-4 rounded-lg shadow-lg bg-[#1F252A] border-2 break-inside-avoid ${
-                          isCheapest ? 'border-[#34C759]' : 'border-[#3A4450]'
-                        }`}
-                        variants={cardVariants}
+                        className="p-4 break-inside-avoid"
+                        variants={productVariants}
                         initial="hidden"
                         whileInView="visible"
                         viewport={{ once: false }}
-                        whileHover={{ scale: 1.05, rotateX: 10, rotateY: 10 }}
-                        transition={{ ease: 'easeInOut' }}
-                        style={{ perspective: 1000 }}
+                        custom={index}
+                        animate="animate"
+                        whileHover={{ scale: 1.05 }}
                       >
-                        <div className="text-[#FFFFFF] p-4 text-center">
-                          <h3 className="font-bold text-[#FFFFFF]">{product.name}</h3>
+                        {/* Contenedor con efecto Float y Glassmorphism */}
+                        <motion.div
+                          className="text-[#FFFFFF] p-4 text-center rounded-lg backdrop-filter backdrop-blur-sm bg-opacity-10 bg-gray-800"
+                          variants={floatVariants}
+                          animate="animate"
+                          style={{
+                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+                          }}
+                        >
+                          <h3 className="font-bold text-[#FFFFFF] text-lg">{product.name}</h3>
                           <p className="text-[#FFFFFF]">Precio: ${product.price.toFixed(2)}</p>
                           <p className="text-[#FFFFFF]">Tienda: {product.store}</p>
-                          <p className="text-[#FFFFFF]">Categoría: {product.category}</p>
+                          <p className="text-[#FFFFFF]">
+                            Fecha de Carga: {product.uploadDate ? format(new Date(product.uploadDate), 'dd/MM/yyyy') : 'N/A'}
+                          </p>
                           {isCheapest && (
                             <motion.p
                               className="text-[#34C759] font-semibold mt-2"
@@ -195,13 +229,15 @@ function Home() {
                               Mejor Precio
                             </motion.p>
                           )}
-                          <button
+                          <motion.button
                             onClick={() => addToCart(product)}
-                            className="mt-2 px-4 py-2 bg-[#3B82F6] text-[#FFFFFF] rounded-lg"
+                            className="mt-4 px-4 py-2 bg-[#3B82F6] text-[#FFFFFF] rounded-lg"
+                            whileHover="hover"
+                            variants={buttonVariants}
                           >
                             Agregar al Carrito
-                          </button>
-                        </div>
+                          </motion.button>
+                        </motion.div>
                       </motion.div>
                     );
                   })}
