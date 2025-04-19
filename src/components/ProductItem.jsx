@@ -27,7 +27,7 @@ const ProductItem = React.memo(({ product, index, cheapestProducts, addToCart })
         )}
         <button
           onClick={() => addToCart(product)}
-          className="mt-4 px-4 py-2 bg-[#3B82F6] text-[#FFFFFF] rounded-lg"
+          className="mt-4 px-4 py-2 bg-[#3984fc] text-[#FFFFFF] rounded-lg"
         >
           Agregar al Carrito
         </button>
