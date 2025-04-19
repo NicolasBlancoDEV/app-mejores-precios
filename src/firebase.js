@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 
-// Configuración de Firebase (reemplaza con tus credenciales)
+// Configuración de Firebase
 const firebaseConfig = {
     apiKey: "AIzaSyAH79Cxqb64KarifDMfd_Fz8Ve3hba2WPo",
     authDomain: "pricecompareapp-8831e.firebaseapp.com",

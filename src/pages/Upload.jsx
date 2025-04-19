@@ -10,6 +10,9 @@ function Upload() {
   const [category, setCategory] = useState('Cocina');
   const [suggestions, setSuggestions] = useState([]);
   const [isFocused, setIsFocused] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
 
   const handleNameChange = (e) => {
     const value = e.target.value;
@@ -42,14 +45,39 @@ function Upload() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name || !price || !store || !category) {
-      alert('Por favor, completa todos los campos.');
+      setError('Por favor, completa todos los campos obligatorios.');
       return;
     }
-    await addProduct({ name, price: Number(price), store, category });
-    setName('');
-    setPrice('');
-    setStore('');
-    setCategory('Cocina');
+
+    setIsLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      // Crear el objeto del producto
+      const productData = {
+        name,
+        price: Number(price),
+        store,
+        category,
+        name_lower: name.toLowerCase(), // Para búsquedas
+        uploadDate: new Date().toISOString(),
+      };
+
+      // Agregar el producto usando el contexto
+      await addProduct(productData);
+
+      setSuccess('Producto subido exitosamente');
+      setName('');
+      setPrice('');
+      setStore('');
+      setCategory('Cocina');
+    } catch (err) {
+      console.error('Error al subir el producto:', err);
+      setError('Error al subir el producto. Por favor, intenta de nuevo.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const containerVariants = {
@@ -71,6 +99,8 @@ function Upload() {
         Subir Producto
       </h1>
       <form onSubmit={handleSubmit} className="max-w-md mx-auto bg-[#1F252A] p-6 rounded-lg shadow-md border-2 border-[#3A4450]">
+        {error && <p className="text-red-500 mb-4">{error}</p>}
+        {success && <p className="text-[#34C759] mb-4">{success}</p>}
         <div className="mb-4 relative">
           <label className="block text-[#FFFFFF] mb-2">Nombre del Producto</label>
           <input
@@ -135,11 +165,12 @@ function Upload() {
         </div>
         <motion.button
           type="submit"
-          className="w-full px-4 py-2 bg-[#3B82F6] text-[#FFFFFF] rounded-lg"
+          disabled={isLoading}
+          className="w-full px-4 py-2 bg-[#3B82F6] text-[#FFFFFF] rounded-lg disabled:opacity-50"
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
-          Subir Producto
+          {isLoading ? 'Subiendo...' : 'Subir Producto'}
         </motion.button>
       </form>
     </motion.div>

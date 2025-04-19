@@ -1,10 +1,11 @@
-import { useContext, useState, useEffect } from 'react';
+import { useContext, useState, useEffect, Suspense, lazy } from 'react';
 import { ProductContext } from '../context/ProductContext';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { FaShoppingCart } from 'react-icons/fa';
 import { format } from 'date-fns';
+import { db } from '../firebase';
+import { collection, query, orderBy, limit, startAfter, getDocs, where } from 'firebase/firestore';
 
-// Variantes para el spinner de carga
 const spinnerVariants = {
   animate: {
     rotate: 360,
@@ -16,7 +17,6 @@ const spinnerVariants = {
   },
 };
 
-// Variantes para el texto "Mejor Precio" con Pulse
 const pulseVariants = {
   animate: {
     scale: [1, 1.1, 1],
@@ -28,7 +28,6 @@ const pulseVariants = {
   },
 };
 
-// Variantes para el efecto Float de los productos
 const floatVariants = {
   animate: {
     y: [0, -10, 0],
@@ -40,21 +39,19 @@ const floatVariants = {
   },
 };
 
-// Variantes para la entrada de los productos (Slide In + Fade In)
 const productVariants = {
   hidden: { opacity: 0, y: 50 },
   visible: (i) => ({
     opacity: 1,
     y: 0,
     transition: {
-      delay: i * 0.1, // Retraso para que entren uno por uno
+      delay: i * 0.1,
       duration: 0.5,
       ease: 'easeInOut',
     },
   }),
 };
 
-// Variantes para el botón (Hover Lift)
 const buttonVariants = {
   hover: {
     y: -5,
@@ -63,32 +60,76 @@ const buttonVariants = {
   },
 };
 
+const ProductItem = lazy(() => import("../components/ProductItem")); // Corrección aquí
+
 function Home() {
-  const { debouncedSearchProductsInFirestore, products, addToCart } = useContext(ProductContext);
+  const { addToCart } = useContext(ProductContext);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredProducts, setFilteredProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [lastDoc, setLastDoc] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
 
-  // Efecto para búsqueda
-  useEffect(() => {
-    if (debouncedSearchProductsInFirestore) {
-      debouncedSearchProductsInFirestore(searchTerm, (results) => {
-        setFilteredProducts(results);
-      });
-    }
-  }, [searchTerm, debouncedSearchProductsInFirestore]);
+  const fetchProducts = async (isLoadMore = false) => {
+    try {
+      setIsLoading(true);
+      const productsQuery = query(
+        collection(db, 'products'),
+        orderBy('name'),
+        limit(10),
+        ...(isLoadMore && lastDoc ? [startAfter(lastDoc)] : [])
+      );
 
-  // Simulación de carga
-  useEffect(() => {
-    setTimeout(() => {
+      const querySnapshot = await getDocs(productsQuery);
+      const productsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      if (isLoadMore) {
+        setAllProducts(prev => [...prev, ...productsData]);
+      } else {
+        setAllProducts(productsData);
+      }
+
+      setLastDoc(querySnapshot.docs[querySnapshot.docs.length - 1]);
+      setHasMore(querySnapshot.docs.length === 10);
       setIsLoading(false);
-    }, 2000);
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
   }, []);
 
-  // Determinar productos a mostrar
-  const displayedProducts = searchTerm ? filteredProducts : products;
+  useEffect(() => {
+    if (searchTerm) {
+      const q = query(
+        collection(db, 'products'),
+        orderBy('name_lower'),
+        where('name_lower', '>=', searchTerm.toLowerCase()),
+        where('name_lower', '<=', searchTerm.toLowerCase() + '\uf8ff'),
+        limit(10)
+      );
+      getDocs(q).then((querySnapshot) => {
+        const results = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setFilteredProducts(results);
+        setIsLoading(false);
+      });
+    } else {
+      setFilteredProducts([]);
+    }
+  }, [searchTerm]);
 
-  // Encontrar el producto más barato por nombre
+  const displayedProducts = searchTerm ? filteredProducts : allProducts;
+
   const getCheapestProductByName = (productList) => {
     const nameToCheapest = {};
     productList.forEach((product) => {
@@ -102,12 +143,10 @@ function Home() {
 
   const cheapestProducts = getCheapestProductByName(displayedProducts);
 
-  // Manejador de búsqueda
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
   };
 
-  // Efecto Parallax para el fondo
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const backgroundX = useTransform(x, [-100, 100], [-10, 10]);
@@ -128,13 +167,16 @@ function Home() {
     y.set(0);
   };
 
+  const loadMore = () => {
+    fetchProducts(true);
+  };
+
   return (
     <motion.div
       className="min-h-screen pb-8 px-6 relative overflow-hidden"
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
     >
-      {/* Fondo con Animated Gradient y Parallax en tonos oscuros */}
       <motion.div
         className="fixed inset-0 bg-gradient-to-br from-gray-900 via-slate-800 to-black z-0"
         style={{ x: backgroundX, y: backgroundY }}
@@ -148,23 +190,21 @@ function Home() {
         transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
       />
 
-      {/* Contenedor principal */}
       <div className="relative z-10">
-        {isLoading ? (
+        {isLoading && displayedProducts.length === 0 ? (
           <motion.div
-            className="flex justify-center items-center h-64"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            className="fixed inset-0 flex flex-col justify-center items-center z-20"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, ease: 'easeInOut' }}
           >
             <motion.div variants={spinnerVariants} animate="animate">
-              <FaShoppingCart size={32} className="text-[#34C759]" />
+              <FaShoppingCart size={48} className="text-[#34C759]" />
             </motion.div>
-            <span className="text-[#FFFFFF] text-lg ml-4">Cargando...</span>
+            <span className="text-[#FFFFFF] text-xl mt-4">Cargando...</span>
           </motion.div>
         ) : (
           <>
-            {/* Barra de búsqueda con Fade In, ajustada para estar más cerca del navbar */}
             <motion.div
               className="container mx-auto mb-6 mt-6"
               initial={{ opacity: 0 }}
@@ -184,64 +224,31 @@ function Home() {
               </div>
             </motion.div>
 
-            {/* Productos en Masonry Grid, sin cards */}
             <div className="container mx-auto">
               {displayedProducts.length > 0 ? (
-                <div className="columns-1 md:columns-3 gap-4 space-y-4">
-                  {displayedProducts.map((product, index) => {
-                    const isCheapest =
-                      cheapestProducts[product.name.toLowerCase()] &&
-                      cheapestProducts[product.name.toLowerCase()].id === product.id;
-
-                    return (
-                      <motion.div
-                        key={product.id}
-                        className="p-4 break-inside-avoid"
-                        variants={productVariants}
-                        initial="hidden"
-                        whileInView="visible"
-                        viewport={{ once: false }}
-                        custom={index}
-                        animate="animate"
-                        whileHover={{ scale: 1.05 }}
-                      >
-                        {/* Contenedor con efecto Float y Glassmorphism */}
-                        <motion.div
-                          className="text-[#FFFFFF] p-4 text-center rounded-lg backdrop-filter backdrop-blur-sm bg-opacity-10 bg-gray-800"
-                          variants={floatVariants}
-                          animate="animate"
-                          style={{
-                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-                          }}
-                        >
-                          <h3 className="font-bold text-[#FFFFFF] text-lg">{product.name}</h3>
-                          <p className="text-[#FFFFFF]">Precio: ${product.price.toFixed(2)}</p>
-                          <p className="text-[#FFFFFF]">Tienda: {product.store}</p>
-                          <p className="text-[#FFFFFF]">
-                            Fecha de Carga: {product.uploadDate ? format(new Date(product.uploadDate), 'dd/MM/yyyy') : 'N/A'}
-                          </p>
-                          {isCheapest && (
-                            <motion.p
-                              className="text-[#34C759] font-semibold mt-2"
-                              variants={pulseVariants}
-                              animate="animate"
-                            >
-                              Mejor Precio
-                            </motion.p>
-                          )}
-                          <motion.button
-                            onClick={() => addToCart(product)}
-                            className="mt-4 px-4 py-2 bg-[#3B82F6] text-[#FFFFFF] rounded-lg"
-                            whileHover="hover"
-                            variants={buttonVariants}
-                          >
-                            Agregar al Carrito
-                          </motion.button>
-                        </motion.div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
+                <>
+                  <div className="columns-1 md:columns-3 gap-4 space-y-4">
+                    {displayedProducts.map((product, index) => (
+                      <Suspense key={product.id} fallback={<div>Cargando producto...</div>}>
+                        <ProductItem
+                          product={product}
+                          index={index}
+                          cheapestProducts={cheapestProducts}
+                          addToCart={addToCart}
+                        />
+                      </Suspense>
+                    ))}
+                  </div>
+                  {hasMore && (
+                    <button
+                      onClick={loadMore}
+                      disabled={isLoading}
+                      className="mt-6 px-4 py-2 bg-[#3B82F6] text-[#FFFFFF] rounded-lg block mx-auto"
+                    >
+                      {isLoading ? 'Cargando más...' : 'Cargar más'}
+                    </button>
+                  )}
+                </>
               ) : (
                 <p className="text-[#FFFFFF] text-center">No se encontraron productos</p>
               )}
