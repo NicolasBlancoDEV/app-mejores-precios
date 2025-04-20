@@ -66,7 +66,7 @@ function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [lastDoc, setLastDoc] = useState(null);
   const [hasMore, setHasMore] = useState(true);
-  const [cheapestProducts, setCheapestProducts] = useState([]);
+  const [cheapestProductsMap, setCheapestProductsMap] = useState({});
 
   const fetchProducts = async (isLoadMore = false) => {
     try {
@@ -133,14 +133,14 @@ function Home() {
       productList.forEach((product) => {
         const nameLower = product.name.toLowerCase();
         if (!nameToCheapest[nameLower] || product.price < nameToCheapest[nameLower].price) {
-          nameToCheapest[nameLower] = product;
+          nameToCheapest[nameLower] = { ...product };
         }
       });
-      return Object.values(nameToCheapest);
+      return nameToCheapest;
     };
 
     const cheapest = getCheapestProductByName(displayedProducts);
-    setCheapestProducts(cheapest);
+    setCheapestProductsMap(cheapest);
   }, [allProducts, filteredProducts, searchTerm]);
 
   const displayedProducts = searchTerm ? filteredProducts : allProducts;
@@ -227,48 +227,39 @@ function Home() {
             </motion.div>
 
             <div className="container mx-auto">
-              {/* Sección de Mejores Precios */}
-              {cheapestProducts.length > 0 && (
-                <div className="mb-8">
-                  <h2 className="text-xl font-semibold text-[#FFFFFF] text-center mb-4">
-                    Mejores Precios
-                  </h2>
-                  <div className="columns-1 md:columns-3 gap-4 space-y-4">
-                    {cheapestProducts.map((product, index) => (
-                      <Suspense key={product.id} fallback={<div>Cargando producto...</div>}>
-                        <motion.div
-                          custom={index}
-                          variants={productVariants}
-                          initial="hidden"
-                          animate="visible"
-                        >
-                          <ProductItem product={product} />
-                        </motion.div>
-                      </Suspense>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Todos los Productos */}
               <h2 className="text-xl font-semibold text-[#FFFFFF] text-center mb-4">
-                Todos los Productos
+                Productos
               </h2>
               {displayedProducts.length > 0 ? (
                 <>
-                  <div className="columns-1 md:columns-3 gap-4 space-y-4">
-                    {displayedProducts.map((product, index) => (
-                      <Suspense key={product.id} fallback={<div>Cargando producto...</div>}>
-                        <motion.div
-                          custom={index}
-                          variants={productVariants}
-                          initial="hidden"
-                          animate="visible"
-                        >
-                          <ProductItem product={product} />
-                        </motion.div>
-                      </Suspense>
-                    ))}
+                  <div className="space-y-6">
+                    {displayedProducts.map((product, index) => {
+                      const isCheapest = cheapestProductsMap[product.name.toLowerCase()]?.id === product.id;
+                      return (
+                        <Suspense key={product.id} fallback={<div>Cargando producto...</div>}>
+                          <motion.div
+                            custom={index}
+                            variants={productVariants}
+                            initial="hidden"
+                            animate="visible"
+                            className="relative flex flex-col items-center"
+                          >
+                            {isCheapest && (
+                              <div className="absolute top-0 left-0 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded">
+                                Mejor Precio
+                              </div>
+                            )}
+                            <div
+                              className={`w-full max-w-md ${isCheapest ? 'bg-green-500/20 border-transparent rounded-lg p-4' : ''}`}
+                            >
+                              <ProductItem product={product} />
+                            </div>
+                            <hr className="w-1/2 mx-auto border-t border-[#3A4450] my-4" />
+                          </motion.div>
+                        </Suspense>
+                      );
+                    })}
                   </div>
                   {hasMore && (
                     <motion.button

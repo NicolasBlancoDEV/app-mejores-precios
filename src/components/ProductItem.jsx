@@ -38,7 +38,6 @@ const ProductItem = ({ product }) => {
       if (userSnap.exists()) {
         userData = userSnap.data();
       } else {
-        // Si el documento no existe, lo creamos
         userData = {
           uid: user.uid,
           email: user.email,
@@ -74,26 +73,18 @@ const ProductItem = ({ product }) => {
   };
 
   return (
-    <motion.div
-      className="bg-[#1F252A] p-4 rounded-lg shadow border-2 border-[#3A4450] w-full max-w-sm"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      whileHover="hover"
-      variants={hoverVariants}
-    >
-      <div className="text-center">
-        <h3 className="font-bold text-[#FFFFFF]">{product.name}</h3>
-        <p className="text-[#A0AEC0]">Precio: ${product.price?.toFixed(2)}</p>
-        {product.store && <p className="text-[#A0AEC0]">Tienda: {product.store}</p>}
-        <motion.button
-          onClick={handleAddToCart}
-          className="mt-2 px-4 py-2 bg-blue-500 text-[#FFFFFF] rounded-lg"
-          whileHover={{ scale: 1.05 }}
-        >
-          Agregar al Carrito
-        </motion.button>
-      </div>
-    </motion.div>
+    <div className="flex flex-col items-center">
+      <h3 className="font-bold text-[#FFFFFF] text-lg">{product.name}</h3>
+      <p className="text-[#A0AEC0] text-sm">Precio: ${product.price?.toFixed(2)}</p>
+      {product.store && <p className="text-[#A0AEC0] text-sm">Tienda: {product.store}</p>}
+      <motion.button
+        onClick={handleAddToCart}
+        className="mt-2 px-4 py-2 bg-blue-500 text-[#FFFFFF] rounded-lg"
+        whileHover={{ scale: 1.05 }}
+      >
+        Agregar al Carrito
+      </motion.button>
+    </div>
   );
 };
 
