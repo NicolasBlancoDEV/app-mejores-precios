@@ -2,7 +2,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { FaShoppingCart } from 'react-icons/fa';
 import { db } from '../firebase';
-import { collection, query, orderBy, limit, startAfter, getDocs, where } from 'firebase/firestore';
+import { collection, query, orderBy, limit, startAfter, getDocs } from 'firebase/firestore';
 import ProductItem from '../components/ProductItem';
 
 const spinnerVariants = {
@@ -59,6 +59,15 @@ const buttonVariants = {
   },
 };
 
+// Función para normalizar texto: elimina acentos y convierte a minúsculas
+const normalizeText = (text) => {
+  return text
+    .toLowerCase()
+    .normalize('NFD') // Descompone caracteres con acentos (por ejemplo, "é" se convierte en "e" + el acento)
+    .replace(/[\u0300-\u036f]/g, '') // Elimina los acentos
+    .replace(/[^a-z0-9\s]/g, ''); // Elimina caracteres especiales (excepto letras, números y espacios)
+};
+
 function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredProducts, setFilteredProducts] = useState([]);
@@ -103,27 +112,21 @@ function Home() {
     fetchProducts();
   }, []);
 
+  // Filtrar productos en el lado del cliente
   useEffect(() => {
-    if (searchTerm) {
-      const q = query(
-        collection(db, 'products'),
-        orderBy('name_lower'),
-        where('name_lower', '>=', searchTerm.toLowerCase()),
-        where('name_lower', '<=', searchTerm.toLowerCase() + '\uf8ff'),
-        limit(10)
-      );
-      getDocs(q).then((querySnapshot) => {
-        const results = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setFilteredProducts(results);
-        setIsLoading(false);
-      });
-    } else {
+    if (searchTerm.trim() === '') {
       setFilteredProducts([]);
+      return;
     }
-  }, [searchTerm]);
+
+    const normalizedSearchTerm = normalizeText(searchTerm);
+    const filtered = allProducts.filter((product) => {
+      const normalizedProductName = normalizeText(product.name);
+      return normalizedProductName.includes(normalizedSearchTerm);
+    });
+
+    setFilteredProducts(filtered);
+  }, [searchTerm, allProducts]);
 
   // Calcular los mejores precios después de actualizar los productos
   useEffect(() => {
@@ -217,7 +220,7 @@ function Home() {
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Buscar productos..."
+                    placeholder="Buscar productos (ej. 1kg, Hellmann's)..."
                     value={searchTerm}
                     onChange={handleSearch}
                     className="w-full max-w-sm md:max-w-md p-3 border rounded-lg text-[#000000] placeholder-[#000000] focus:outline-none focus:ring-2 focus:ring-[#3B82F6] text-center md:text-center"
