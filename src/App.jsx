@@ -5,6 +5,8 @@ import Savings from './pages/Savings';
 import Cart from './pages/Cart';
 import SearchBestPrice from './pages/SearchBestPrice';
 import Profile from './pages/Profile';
+import Login from './pages/Login'; // Nueva página de Login
+import Signup from './pages/Signup'; // Nueva página de Signup
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Navbar from './components/Navbar';
@@ -29,6 +31,8 @@ function App() {
             <Route path="/cart" element={<Cart />} />
             <Route path="/search-best-price" element={<SearchBestPrice />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/login" element={<Login />} /> {/* Nueva ruta para Login */}
+            <Route path="/signup" element={<Signup />} /> {/* Nueva ruta para Signup */}
           </Routes>
         </ErrorBoundary>
       </div>

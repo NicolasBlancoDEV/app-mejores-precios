@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth'; // Importamos el módulo de autenticación
 
-// Configuración de Firebase
 const firebaseConfig = {
     apiKey: "AIzaSyAH79Cxqb64KarifDMfd_Fz8Ve3hba2WPo",
     authDomain: "pricecompareapp-8831e.firebaseapp.com",
@@ -12,10 +12,8 @@ const firebaseConfig = {
     measurementId: "G-9F0HP6H07D"
 };
 
-// Inicializar Firebase
 const app = initializeApp(firebaseConfig);
-
-// Inicializar Firestore
 const db = getFirestore(app);
+const auth = getAuth(app); // Inicializamos la autenticación
 
-export { db };
+export { db, auth }; // Exportamos auth para usarlo en otros archivos

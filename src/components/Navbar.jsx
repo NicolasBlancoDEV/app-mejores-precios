@@ -1,7 +1,9 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FaHome, FaPlus, FaBars, FaTimes, FaShoppingCart, FaSearch, FaUser } from 'react-icons/fa';
+import { FaHome, FaPlus, FaBars, FaTimes, FaShoppingCart, FaSearch, FaUser, FaSignOutAlt } from 'react-icons/fa';
+import { auth } from '../firebase'; // Importamos Firebase auth
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 // Variantes para el efecto Float de los íconos
 const floatVariants = {
@@ -28,8 +30,29 @@ const linkVariants = {
 
 function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [user, setUser] = useState(null); // Estado para el usuario autenticado
+  const navigate = useNavigate();
+
+  // Escuchar cambios en el estado de autenticación
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser); // Actualizamos el estado del usuario
+    });
+    return () => unsubscribe();
+  }, []);
 
   const toggleMenu = () => setIsOpen(!isOpen);
+
+  // Función para cerrar sesión
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      navigate('/login');
+      toggleMenu(); // Cerrar el menú en pantallas pequeñas
+    } catch (err) {
+      console.error('Error al cerrar sesión:', err);
+    }
+  };
 
   return (
     <nav className="sticky top-0 z-50 bg-transparent">
@@ -92,15 +115,48 @@ function Navbar() {
               <FaShoppingCart className="mr-1 text-orange-400" /> Carrito
             </motion.div>
           </Link>
-          <Link to="/profile">
-            <motion.div
-              className="flex items-center text-white"
-              whileHover="hover"
-              variants={linkVariants}
-            >
-              <FaUser className="mr-1 text-indigo-400" /> Mi Perfil
-            </motion.div>
-          </Link>
+          {user ? (
+            <>
+              <Link to="/profile">
+                <motion.div
+                  className="flex items-center text-white"
+                  whileHover="hover"
+                  variants={linkVariants}
+                >
+                  <FaUser className="mr-1 text-indigo-400" /> {user.email}
+                </motion.div>
+              </Link>
+              <motion.button
+                className="flex items-center text-white"
+                whileHover="hover"
+                variants={linkVariants}
+                onClick={handleLogout}
+              >
+                <FaSignOutAlt className="mr-1 text-red-400" /> Cerrar Sesión
+              </motion.button>
+            </>
+          ) : (
+            <>
+              <Link to="/login">
+                <motion.div
+                  className="flex items-center text-white"
+                  whileHover="hover"
+                  variants={linkVariants}
+                >
+                  <FaUser className="mr-1 text-indigo-400" /> Iniciar Sesión
+                </motion.div>
+              </Link>
+              <Link to="/signup">
+                <motion.div
+                  className="flex items-center text-white"
+                  whileHover="hover"
+                  variants={linkVariants}
+                >
+                  <FaUser className="mr-1 text-indigo-400" /> Registrarse
+                </motion.div>
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Botón del menú hamburguesa con efecto Float */}
@@ -168,15 +224,48 @@ function Navbar() {
               <FaShoppingCart className="mr-2 text-orange-400" /> Carrito
             </motion.div>
           </Link>
-          <Link to="/profile" onClick={toggleMenu}>
-            <motion.div
-              className="flex items-center text-white"
-              whileHover="hover"
-              variants={linkVariants}
-            >
-              <FaUser className="mr-2 text-indigo-400" /> Mi Perfil
-            </motion.div>
-          </Link>
+          {user ? (
+            <>
+              <Link to="/profile" onClick={toggleMenu}>
+                <motion.div
+                  className="flex items-center text-white"
+                  whileHover="hover"
+                  variants={linkVariants}
+                >
+                  <FaUser className="mr-2 text-indigo-400" /> {user.email}
+                </motion.div>
+              </Link>
+              <motion.button
+                className="flex items-center text-white"
+                whileHover="hover"
+                variants={linkVariants}
+                onClick={handleLogout}
+              >
+                <FaSignOutAlt className="mr-2 text-red-400" /> Cerrar Sesión
+              </motion.button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" onClick={toggleMenu}>
+                <motion.div
+                  className="flex items-center text-white"
+                  whileHover="hover"
+                  variants={linkVariants}
+                >
+                  <FaUser className="mr-2 text-indigo-400" /> Iniciar Sesión
+                </motion.div>
+              </Link>
+              <Link to="/signup" onClick={toggleMenu}>
+                <motion.div
+                  className="flex items-center text-white"
+                  whileHover="hover"
+                  variants={linkVariants}
+                >
+                  <FaUser className="mr-2 text-indigo-400" /> Registrarse
+                </motion.div>
+              </Link>
+            </>
+          )}
         </div>
       </motion.div>
     </nav>
