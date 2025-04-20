@@ -30,7 +30,7 @@ const SearchBestPrice = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
-  const [bestPriceMap, setBestPriceMap] = useState({}); // Mapa para identificar productos con mejor precio
+  const [bestPriceMap, setBestPriceMap] = useState({});
   const { addToCart } = useCart();
   const navigate = useNavigate();
 
@@ -43,7 +43,7 @@ const SearchBestPrice = () => {
         ...doc.data(),
       }));
       setProducts(productsData);
-      setFilteredProducts(productsData); // Mostrar todos los productos inicialmente
+      setFilteredProducts(productsData);
     }, (error) => {
       console.error('Error al cargar los productos:', error);
       toast.error('Error al cargar los productos: ' + error.message);
@@ -68,10 +68,9 @@ const SearchBestPrice = () => {
       Object.keys(groupedByName).forEach((name) => {
         const productGroup = groupedByName[name];
         if (productGroup.length > 1) {
-          // Ordenar por precio para encontrar el más bajo
           const sortedByPrice = [...productGroup].sort((a, b) => a.price - b.price);
-          const bestPriceProduct = sortedByPrice[0]; // El producto con el precio más bajo
-          bestPriceMap[name] = bestPriceProduct.id; // Guardar el ID del producto con mejor precio
+          const bestPriceProduct = sortedByPrice[0];
+          bestPriceMap[name] = bestPriceProduct.id;
         }
       });
 
@@ -115,7 +114,6 @@ const SearchBestPrice = () => {
         initial="hidden"
         animate="visible"
       >
-        {/* Campo de búsqueda */}
         <div className="mb-6">
           <input
             type="text"
@@ -123,11 +121,10 @@ const SearchBestPrice = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Buscar productos..."
             className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            autoComplete="off" // Desactivar sugerencias
+            autoComplete="off"
           />
         </div>
 
-        {/* Lista de productos */}
         {filteredProducts.length > 0 ? (
           <div className="space-y-4">
             {filteredProducts.map((product, index) => (

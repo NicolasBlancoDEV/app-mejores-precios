@@ -1,19 +1,22 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth'; // Importamos el módulo de autenticación
+import { getAuth } from 'firebase/auth';
+import { getStorage } from 'firebase/storage'; // Importamos el módulo de Storage
 
 const firebaseConfig = {
-    apiKey: "AIzaSyAH79Cxqb64KarifDMfd_Fz8Ve3hba2WPo",
-    authDomain: "pricecompareapp-8831e.firebaseapp.com",
-    projectId: "pricecompareapp-8831e",
-    storageBucket: "pricecompareapp-8831e.firebasestorage.app",
-    messagingSenderId: "154771645191",
-    appId: "1:154771645191:web:14e043add23e0d7d31dba2",
-    measurementId: "G-9F0HP6H07D"
+  apiKey: "AIzaSyAH79Cxqb64KarifDMfd_Fz8Ve3hba2WPo",
+  authDomain: "pricecompareapp-8831e.firebaseapp.com",
+  projectId: "pricecompareapp-8831e",
+  storageBucket: "pricecompareapp-8831e.firebasestorage.app",
+  messagingSenderId: "154771645191",
+  appId: "1:154771645191:web:14e043add23e0d7d31dba2",
+  measurementId: "G-9F0HP6H07D"
 };
 
+// Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app); // Inicializamos la autenticación
+const auth = getAuth(app);
+const storage = getStorage(app); // Inicializamos Storage
 
-export { db, auth }; // Exportamos auth para usarlo en otros archivos
+export { db, auth, storage }; // Exportamos storage para usarlo en otros archivos

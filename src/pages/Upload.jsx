@@ -1,180 +1,138 @@
-import { useContext, useState } from 'react';
-import { ProductContext } from '../context/ProductContext';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { auth, db } from '../firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 
-function Upload() {
-  const { addProduct, products } = useContext(ProductContext);
+// Variantes para animaciones
+const containerVariants = {
+  hidden: { opacity: 0, y: 50 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+};
+
+const buttonVariants = {
+  hover: { scale: 1.05 },
+  tap: { scale: 0.95 },
+};
+
+const Upload = () => {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
-  const [store, setStore] = useState('');
-  const [category, setCategory] = useState('Cocina');
-  const [suggestions, setSuggestions] = useState([]);
-  const [isFocused, setIsFocused] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
+  const [storeName, setStoreName] = useState('');
+  const [user, setUser] = useState(null);
+  const navigate = useNavigate();
 
-  const handleNameChange = (e) => {
-    const value = e.target.value;
-    setName(value);
+  // Verificar si el usuario está autenticado
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      setUser(currentUser);
+      if (!currentUser) {
+        toast.error('Por favor, inicia sesión para subir productos');
+        navigate('/login');
+      }
+    });
+    return () => unsubscribe();
+  }, [navigate]);
 
-    if (value.trim() === '') {
-      setSuggestions([]);
-      return;
-    }
-
-    const uniqueProductNames = [...new Set(products.map((product) => product.name.toLowerCase()))];
-    const filteredSuggestions = uniqueProductNames
-      .filter((productName) => productName.includes(value.toLowerCase()))
-      .map((productName) => products.find((product) => product.name.toLowerCase() === productName).name)
-      .slice(0, 5);
-
-    setSuggestions(filteredSuggestions);
-  };
-
-  const handleSuggestionClick = (suggestion) => {
-    setName(suggestion);
-    setSuggestions([]);
-    setIsFocused(false);
-  };
-
-  const handleBlur = () => {
-    setTimeout(() => setIsFocused(false), 200);
-  };
-
-  const handleSubmit = async (e) => {
+  // Manejar la subida manual del producto
+  const handleManualUpload = async (e) => {
     e.preventDefault();
-    if (!name || !price || !store || !category) {
-      setError('Por favor, completa todos los campos obligatorios.');
+    if (!user) return;
+
+    if (!name || !price || !storeName) {
+      toast.error('Por favor, completa todos los campos obligatorios');
       return;
     }
-
-    setIsLoading(true);
-    setError(null);
-    setSuccess(null);
 
     try {
-      // Crear el objeto del producto
-      const productData = {
+      const productId = Date.now().toString();
+      const productRef = doc(db, 'products', productId);
+      await setDoc(productRef, {
+        id: productId,
         name,
-        price: Number(price),
-        store,
-        category,
-        name_lower: name.toLowerCase(), // Para búsquedas
-        uploadDate: new Date().toISOString(),
-      };
+        price: parseFloat(price),
+        store: storeName,
+        createdAt: new Date().toISOString(),
+        userId: user.uid,
+      });
 
-      // Agregar el producto usando el contexto
-      await addProduct(productData);
-
-      setSuccess('Producto subido exitosamente');
+      toast.success('Producto subido exitosamente');
       setName('');
       setPrice('');
-      setStore('');
-      setCategory('Cocina');
-    } catch (err) {
-      console.error('Error al subir el producto:', err);
-      setError('Error al subir el producto. Por favor, intenta de nuevo.');
-    } finally {
-      setIsLoading(false);
+      setStoreName('');
+    } catch (error) {
+      console.error('Error al subir el producto:', error);
+      toast.error('Error al subir el producto: ' + error.message);
     }
-  };
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { duration: 0.5 } },
   };
 
   return (
-    <motion.div
-      className="container mx-auto p-4 pt-20 pb-8"
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
-    >
-      <h1
-        className="text-2xl font-bold mb-6 text-[#FFFFFF] text-center"
-        style={{ fontFamily: "'Poppins', sans-serif" }}
+    <div className="min-h-screen bg-gray-800 flex items-center justify-center py-8 px-4">
+      <motion.div
+        className="bg-gray-700 p-8 rounded-lg shadow-lg w-full max-w-2xl"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
       >
-        Subir Producto
-      </h1>
-      <form onSubmit={handleSubmit} className="max-w-md mx-auto bg-[#1F252A] p-6 rounded-lg shadow-md border-2 border-[#3A4450]">
-        {error && <p className="text-red-500 mb-4">{error}</p>}
-        {success && <p className="text-[#34C759] mb-4">{success}</p>}
-        <div className="mb-4 relative">
-          <label className="block text-[#FFFFFF] mb-2">Nombre del Producto</label>
-          <input
-            type="text"
-            value={name}
-            onChange={handleNameChange}
-            onFocus={() => setIsFocused(true)}
-            onBlur={handleBlur}
-            className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6] bg-[#1F252A] text-[#FFFFFF]"
-            placeholder="Ej: Mayonesa Natura 500g"
-          />
-          {isFocused && suggestions.length > 0 && (
-            <motion.ul
-              className="absolute top-full left-0 w-full bg-[#1F252A] border border-[#3A4450] rounded-lg mt-1 shadow-lg z-10"
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              {suggestions.map((suggestion, index) => (
-                <li
-                  key={index}
-                  onClick={() => handleSuggestionClick(suggestion)}
-                  className="px-4 py-2 hover:bg-[#2D333B] cursor-pointer text-[#FFFFFF]"
-                >
-                  {suggestion}
-                </li>
-              ))}
-            </motion.ul>
-          )}
-        </div>
-        <div className="mb-4">
-          <label className="block text-[#FFFFFF] mb-2">Precio (ARS)</label>
-          <input
-            type="number"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6] bg-[#1F252A] text-[#FFFFFF]"
-            placeholder="Ej: 1200"
-          />
-        </div>
-        <div className="mb-4">
-          <label className="block text-[#FFFFFF] mb-2">Tienda</label>
-          <input
-            type="text"
-            value={store}
-            onChange={(e) => setStore(e.target.value)}
-            className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6] bg-[#1F252A] text-[#FFFFFF]"
-            placeholder="Ej: Supermercado A"
-          />
-        </div>
-        <div className="mb-4">
-          <label className="block text-[#FFFFFF] mb-2">Categoría</label>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6] bg-[#1F252A] text-[#FFFFFF]"
+        <h2 className="text-2xl font-bold text-white text-center mb-6">Subir Productos</h2>
+        <form onSubmit={handleManualUpload} className="space-y-4">
+          <div>
+            <label className="block text-gray-300 mb-1" htmlFor="name">
+              Nombre del Producto
+            </label>
+            <input
+              type="text"
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Ej: Leche La Serenísima"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-gray-300 mb-1" htmlFor="price">
+              Precio
+            </label>
+            <input
+              type="number"
+              id="price"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Ej: 2700"
+              step="0.01"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-gray-300 mb-1" htmlFor="store">
+              Tienda
+            </label>
+            <input
+              type="text"
+              id="store"
+              value={storeName}
+              onChange={(e) => setStoreName(e.target.value)}
+              className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Ej: Supermercado XYZ"
+              required
+            />
+          </div>
+          <motion.button
+            type="submit"
+            className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg"
+            variants={buttonVariants}
+            whileHover="hover"
+            whileTap="tap"
           >
-            <option value="Cocina" className="text-[#FFFFFF] bg-[#1F252A]">Cocina</option>
-            <option value="Limpieza" className="text-[#FFFFFF] bg-[#1F252A]">Limpieza</option>
-            <option value="Bebidas" className="text-[#FFFFFF] bg-[#1F252A]">Bebidas</option>
-          </select>
-        </div>
-        <motion.button
-          type="submit"
-          disabled={isLoading}
-          className="w-full px-4 py-2 bg-[#3B82F6] text-[#FFFFFF] rounded-lg disabled:opacity-50"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          {isLoading ? 'Subiendo...' : 'Subir Producto'}
-        </motion.button>
-      </form>
-    </motion.div>
+            Subir Producto
+          </motion.button>
+        </form>
+      </motion.div>
+    </div>
   );
-}
+};
 
 export default Upload;
