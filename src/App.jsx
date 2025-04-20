@@ -10,31 +10,34 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Navbar from './components/Navbar';
 import ErrorBoundary from './components/ErrorBoundary';
+import { CartProvider } from './context/CartContext'; // Importamos el CartProvider
 
 function App() {
   return (
-    <Router>
-      <div
-        className="min-h-screen"
-        style={{
-          background: 'linear-gradient(135deg, rgba(30, 30, 40, 0.9) 0%, rgba(50, 50, 60, 0.9) 100%)',
-        }}
-      >
-        <Navbar />
-        <ToastContainer />
-        <ErrorBoundary>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/upload" element={<Upload />} />
-            <Route path="/cart" element={<Cart />} />
-            <Route path="/search-best-price" element={<SearchBestPrice />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-          </Routes>
-        </ErrorBoundary>
-      </div>
-    </Router>
+    <CartProvider> {/* Envuelve toda la app con el CartProvider */}
+      <Router>
+        <div
+          className="min-h-screen"
+          style={{
+            background: 'linear-gradient(135deg, rgba(30, 30, 40, 0.9) 0%, rgba(50, 50, 60, 0.9) 100%)',
+          }}
+        >
+          <Navbar />
+          <ToastContainer />
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/upload" element={<Upload />} />
+              <Route path="/cart" element={<Cart />} />
+              <Route path="/search-best-price" element={<SearchBestPrice />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+            </Routes>
+          </ErrorBoundary>
+        </div>
+      </Router>
+    </CartProvider>
   );
 }
 

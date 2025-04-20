@@ -39,12 +39,13 @@ const floatVariants = {
 };
 
 const productVariants = {
-  hidden: { opacity: 0, y: 50 },
+  hidden: { opacity: 0, y: 50, scale: 0.9 },
   visible: (i) => ({
     opacity: 1,
     y: 0,
+    scale: 1,
     transition: {
-      delay: i * 0.1,
+      delay: i * 0.2,
       duration: 0.5,
       ease: 'easeInOut',
     },
@@ -59,18 +60,7 @@ const buttonVariants = {
   },
 };
 
-// Función para normalizar texto: elimina acentos y convierte a minúsculas
-const normalizeText = (text) => {
-  return text
-    .toLowerCase()
-    .normalize('NFD') // Descompone caracteres con acentos (por ejemplo, "é" se convierte en "e" + el acento)
-    .replace(/[\u0300-\u036f]/g, '') // Elimina los acentos
-    .replace(/[^a-z0-9\s]/g, ''); // Elimina caracteres especiales (excepto letras, números y espacios)
-};
-
 function Home() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filteredProducts, setFilteredProducts] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastDoc, setLastDoc] = useState(null);
@@ -112,25 +102,8 @@ function Home() {
     fetchProducts();
   }, []);
 
-  // Filtrar productos en el lado del cliente
-  useEffect(() => {
-    if (searchTerm.trim() === '') {
-      setFilteredProducts([]);
-      return;
-    }
-
-    const normalizedSearchTerm = normalizeText(searchTerm);
-    const filtered = allProducts.filter((product) => {
-      const normalizedProductName = normalizeText(product.name);
-      return normalizedProductName.includes(normalizedSearchTerm);
-    });
-
-    setFilteredProducts(filtered);
-  }, [searchTerm, allProducts]);
-
   // Calcular los mejores precios después de actualizar los productos
   useEffect(() => {
-    const displayedProducts = searchTerm ? filteredProducts : allProducts;
     const getCheapestProductByName = (productList) => {
       const nameToCheapest = {};
       productList.forEach((product) => {
@@ -142,15 +115,9 @@ function Home() {
       return nameToCheapest;
     };
 
-    const cheapest = getCheapestProductByName(displayedProducts);
+    const cheapest = getCheapestProductByName(allProducts);
     setCheapestProductsMap(cheapest);
-  }, [allProducts, filteredProducts, searchTerm]);
-
-  const displayedProducts = searchTerm ? filteredProducts : allProducts;
-
-  const handleSearch = (e) => {
-    setSearchTerm(e.target.value);
-  };
+  }, [allProducts]);
 
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -183,20 +150,12 @@ function Home() {
       onMouseLeave={handleMouseLeave}
     >
       <motion.div
-        className="fixed inset-0 bg-gradient-to-br from-gray-900 via-slate-800 to-black z-0"
+        className="fixed inset-0 bg-gray-800 z-0"
         style={{ x: backgroundX, y: backgroundY }}
-        animate={{
-          background: [
-            'linear-gradient(45deg, #0F172A, #1E293B, #020617)',
-            'linear-gradient(45deg, #1E293B, #020617, #0F172A)',
-            'linear-gradient(45deg, #020617, #0F172A, #1E293B)',
-          ],
-        }}
-        transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
       />
 
-      <div className="relative z-10">
-        {isLoading && displayedProducts.length === 0 ? (
+      <div className="relative z-10 pt-16">
+        {isLoading && allProducts.length === 0 ? (
           <motion.div
             className="fixed inset-0 flex flex-col justify-center items-center z-20"
             initial={{ opacity: 0, scale: 0.8 }}
@@ -209,90 +168,63 @@ function Home() {
             <span className="text-[#FFFFFF] text-xl mt-4">Cargando...</span>
           </motion.div>
         ) : (
-          <>
-            <motion.div
-              className="container mx-auto mb-6 mt-6"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5, ease: 'easeInOut' }}
-            >
-              <div className="flex justify-center">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Buscar productos (ej. 1kg, Hellmann's)..."
-                    value={searchTerm}
-                    onChange={handleSearch}
-                    className="w-full max-w-sm md:max-w-md p-3 border rounded-lg text-[#000000] placeholder-[#000000] focus:outline-none focus:ring-2 focus:ring-[#3B82F6] text-center md:text-center"
-                  />
-                </div>
-              </div>
-            </motion.div>
-
-            <div className="container mx-auto">
-              {/* Todos los Productos */}
-              <h2 className="text-xl font-semibold text-[#FFFFFF] text-center mb-4">
-                Productos
-              </h2>
-              {displayedProducts.length > 0 ? (
-                <>
-                  <div className="space-y-6 lg:grid lg:grid-cols-4 lg:gap-6 lg:space-y-0">
-                    {displayedProducts.map((product, index) => {
-                      const isCheapest = cheapestProductsMap[product.name.toLowerCase()]?.id === product.id;
-                      const isLastInRow = (index + 1) % 4 === 0; // Calcula si es el último producto de la fila (4 columnas)
-                      return (
-                        <Suspense key={product.id} fallback={<div>Cargando producto...</div>}>
-                          <div className="flex flex-col items-center lg:flex-row lg:items-center">
-                            <motion.div
-                              custom={index}
-                              variants={productVariants}
-                              initial="hidden"
-                              animate="visible"
-                              className="relative flex flex-col items-center min-w-0"
+          <div className="container mx-auto mt-6">
+            {allProducts.length > 0 ? (
+              <>
+                <div className="space-y-6 lg:grid lg:grid-cols-4 lg:gap-6 lg:space-y-0">
+                  {allProducts.map((product, index) => {
+                    const isCheapest = cheapestProductsMap[product.name.toLowerCase()]?.id === product.id;
+                    const isLastInRow = (index + 1) % 4 === 0;
+                    return (
+                      <Suspense key={product.id} fallback={<div>Cargando producto...</div>}>
+                        <div className="flex flex-col items-center lg:flex-row lg:items-center">
+                          <motion.div
+                            custom={index}
+                            variants={productVariants}
+                            initial="hidden"
+                            animate="visible"
+                            className="relative flex flex-col items-center min-w-0 z-10"
+                          >
+                            <div
+                              className={`w-full ${isCheapest ? 'bg-green-500/20 border-transparent rounded-lg p-4' : 'bg-gray-700/80 rounded-lg p-4'}`}
                             >
-                              <div
-                                className={`w-full ${isCheapest ? 'bg-green-500/20 border-transparent rounded-lg p-4' : ''}`}
-                              >
-                                {isCheapest && (
-                                  <div className="text-center mb-2">
-                                    <span className="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded">
-                                      Mejor Precio
-                                    </span>
-                                  </div>
-                                )}
-                                <ProductItem product={product} />
-                              </div>
-                            </motion.div>
-                            {/* Línea vertical en pantallas grandes */}
-                            {!isLastInRow && (
-                              <div className="hidden lg:block h-16 border-l border-[#3A4450] mx-3 self-center" />
-                            )}
-                            {/* Línea horizontal en móviles */}
-                            {index < displayedProducts.length - 1 && (
-                              <hr className="w-1/2 mx-auto border-t border-[#3A4450] my-4 lg:hidden" />
-                            )}
-                          </div>
-                        </Suspense>
-                      );
-                    })}
-                  </div>
-                  {hasMore && (
-                    <motion.button
-                      onClick={loadMore}
-                      disabled={isLoading}
-                      className="mt-6 px-4 py-2 bg-[#3B82F6] text-[#FFFFFF] rounded-lg block mx-auto"
-                      whileHover="hover"
-                      variants={buttonVariants}
-                    >
-                      {isLoading ? 'Cargando más...' : 'Cargar más'}
-                    </motion.button>
-                  )}
-                </>
-              ) : (
-                <p className="text-[#FFFFFF] text-center">No se encontraron productos</p>
-              )}
-            </div>
-          </>
+                              {isCheapest && (
+                                <div className="text-center mb-2">
+                                  <span className="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded">
+                                    Mejor Precio
+                                  </span>
+                                </div>
+                              )}
+                              <ProductItem product={product} />
+                            </div>
+                          </motion.div>
+                          {!isLastInRow && (
+                            <div className="hidden lg:block h-16 border-l border-[#3A4450] mx-3 self-center" />
+                          )}
+                          {index < allProducts.length - 1 && (
+                            <hr className="w-1/2 mx-auto border-t border-[#3A4450] my-4 lg:hidden" />
+                          )}
+                        </div>
+                      </Suspense>
+                    );
+                  })}
+                </div>
+                {hasMore && (
+                  <motion.button
+                    onClick={loadMore}
+                    disabled={isLoading}
+                    className="mt-6 px-4 py-2 bg-[#3B82F6] text-[#FFFFFF] rounded-lg block mx-auto z-10"
+                    whileHover="hover"
+                    variants={buttonVariants}
+                  >
+                    {isLoading ? 'Cargando más...' : 'Cargar más'}
+                  </motion.button>
+                )}
+              </>
+            ) : (
+              <p className="text-[#FFFFFF] text-center z-10">No se encontraron productos</p>
+            )}
+          </div>
         )}
       </div>
     </motion.div>

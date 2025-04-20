@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { FaHome, FaPlus, FaBars, FaTimes, FaShoppingCart, FaSearch, FaUser, FaSignOutAlt } from 'react-icons/fa';
 import { auth } from '../firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { useCart } from '../context/CartContext';
 
 // Variantes para el efecto Float de los íconos
 const floatVariants = {
@@ -32,6 +33,7 @@ function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
+  const { getCartCount } = useCart(); // Usamos el contexto para obtener la cantidad de productos
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -53,8 +55,8 @@ function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 bg-transparent">
-      <div className="container mx-auto px-4 py-3 flex justify-between items-center bg-transparent">
+    <nav className="sticky top-0 z-50 bg-gray-700 shadow-lg">
+      <div className="container mx-auto px-4 py-3 flex justify-between items-center bg-gray-700">
         <Link to="/">
           <motion.div
             className="text-2xl font-bold text-white p-2 rounded-full shadow-soft"
@@ -95,11 +97,16 @@ function Navbar() {
           </Link>
           <Link to="/cart">
             <motion.div
-              className="flex items-center text-white"
+              className="flex items-center text-white relative"
               whileHover="hover"
               variants={linkVariants}
             >
               <FaShoppingCart className="mr-1 text-orange-400" /> Carrito
+              {getCartCount() > 0 && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                  {getCartCount()}
+                </span>
+              )}
             </motion.div>
           </Link>
           {user ? (
@@ -146,24 +153,41 @@ function Navbar() {
           )}
         </div>
 
-        <motion.button
-          className="md:hidden text-white p-2 rounded-lg shadow-soft"
-          variants={floatVariants}
-          animate="animate"
-          whileTap={{ scale: 0.9 }}
-          onClick={toggleMenu}
-        >
-          {isOpen ? <FaTimes size={24} className="text-gray-300" /> : <FaBars size={24} className="text-gray-300" />}
-        </motion.button>
+        <div className="flex items-center space-x-4">
+          <Link to="/cart" className="md:hidden relative">
+            <motion.div
+              className="text-white p-2 rounded-lg shadow-soft"
+              variants={floatVariants}
+              animate="animate"
+              whileTap={{ scale: 0.9 }}
+            >
+              <FaShoppingCart size={24} className="text-orange-400" />
+              {getCartCount() > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                  {getCartCount()}
+                </span>
+              )}
+            </motion.div>
+          </Link>
+          <motion.button
+            className="md:hidden text-white p-2 rounded-lg shadow-soft"
+            variants={floatVariants}
+            animate="animate"
+            whileTap={{ scale: 0.9 }}
+            onClick={toggleMenu}
+          >
+            {isOpen ? <FaTimes size={24} className="text-gray-300" /> : <FaBars size={24} className="text-gray-300" />}
+          </motion.button>
+        </div>
       </div>
 
       <motion.div
-        className="md:hidden overflow-hidden bg-transparent"
+        className="md:hidden overflow-hidden bg-gray-600 shadow-lg absolute top-full left-0 w-full z-50"
         initial="hidden"
         animate={isOpen ? "visible" : "hidden"}
         variants={menuVariants}
       >
-        <div className="flex flex-col space-y-2 px-4 py-2 bg-transparent">
+        <div className="flex flex-col space-y-2 px-4 py-2">
           <Link to="/" onClick={toggleMenu}>
             <motion.div
               className="flex items-center text-white"
@@ -189,15 +213,6 @@ function Navbar() {
               variants={linkVariants}
             >
               <FaSearch className="mr-2 text-purple-400" /> Buscar Mejor Precio
-            </motion.div>
-          </Link>
-          <Link to="/cart" onClick={toggleMenu}>
-            <motion.div
-              className="flex items-center text-white"
-              whileHover="hover"
-              variants={linkVariants}
-            >
-              <FaShoppingCart className="mr-2 text-orange-400" /> Carrito
             </motion.div>
           </Link>
           {user ? (
