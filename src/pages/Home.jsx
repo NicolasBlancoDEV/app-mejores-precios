@@ -1,10 +1,9 @@
-import { useContext, useState, useEffect, Suspense, lazy } from 'react';
-import { ProductContext } from '../context/ProductContext';
+import { useState, useEffect, Suspense } from 'react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { FaShoppingCart } from 'react-icons/fa';
-import { format } from 'date-fns';
 import { db } from '../firebase';
 import { collection, query, orderBy, limit, startAfter, getDocs, where } from 'firebase/firestore';
+import ProductItem from '../components/ProductItem';
 
 const spinnerVariants = {
   animate: {
@@ -60,16 +59,14 @@ const buttonVariants = {
   },
 };
 
-const ProductItem = lazy(() => import("../components/ProductItem")); // Corrección aquí
-
 function Home() {
-  const { addToCart } = useContext(ProductContext);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastDoc, setLastDoc] = useState(null);
   const [hasMore, setHasMore] = useState(true);
+  const [cheapestProducts, setCheapestProducts] = useState([]);
 
   const fetchProducts = async (isLoadMore = false) => {
     try {
@@ -128,20 +125,25 @@ function Home() {
     }
   }, [searchTerm]);
 
+  // Calcular los mejores precios después de actualizar los productos
+  useEffect(() => {
+    const displayedProducts = searchTerm ? filteredProducts : allProducts;
+    const getCheapestProductByName = (productList) => {
+      const nameToCheapest = {};
+      productList.forEach((product) => {
+        const nameLower = product.name.toLowerCase();
+        if (!nameToCheapest[nameLower] || product.price < nameToCheapest[nameLower].price) {
+          nameToCheapest[nameLower] = product;
+        }
+      });
+      return Object.values(nameToCheapest);
+    };
+
+    const cheapest = getCheapestProductByName(displayedProducts);
+    setCheapestProducts(cheapest);
+  }, [allProducts, filteredProducts, searchTerm]);
+
   const displayedProducts = searchTerm ? filteredProducts : allProducts;
-
-  const getCheapestProductByName = (productList) => {
-    const nameToCheapest = {};
-    productList.forEach((product) => {
-      const nameLower = product.name.toLowerCase();
-      if (!nameToCheapest[nameLower] || product.price < nameToCheapest[nameLower].price) {
-        nameToCheapest[nameLower] = product;
-      }
-    });
-    return nameToCheapest;
-  };
-
-  const cheapestProducts = getCheapestProductByName(displayedProducts);
 
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
@@ -225,28 +227,59 @@ function Home() {
             </motion.div>
 
             <div className="container mx-auto">
+              {/* Sección de Mejores Precios */}
+              {cheapestProducts.length > 0 && (
+                <div className="mb-8">
+                  <h2 className="text-xl font-semibold text-[#FFFFFF] text-center mb-4">
+                    Mejores Precios
+                  </h2>
+                  <div className="columns-1 md:columns-3 gap-4 space-y-4">
+                    {cheapestProducts.map((product, index) => (
+                      <Suspense key={product.id} fallback={<div>Cargando producto...</div>}>
+                        <motion.div
+                          custom={index}
+                          variants={productVariants}
+                          initial="hidden"
+                          animate="visible"
+                        >
+                          <ProductItem product={product} />
+                        </motion.div>
+                      </Suspense>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Todos los Productos */}
+              <h2 className="text-xl font-semibold text-[#FFFFFF] text-center mb-4">
+                Todos los Productos
+              </h2>
               {displayedProducts.length > 0 ? (
                 <>
                   <div className="columns-1 md:columns-3 gap-4 space-y-4">
                     {displayedProducts.map((product, index) => (
                       <Suspense key={product.id} fallback={<div>Cargando producto...</div>}>
-                        <ProductItem
-                          product={product}
-                          index={index}
-                          cheapestProducts={cheapestProducts}
-                          addToCart={addToCart}
-                        />
+                        <motion.div
+                          custom={index}
+                          variants={productVariants}
+                          initial="hidden"
+                          animate="visible"
+                        >
+                          <ProductItem product={product} />
+                        </motion.div>
                       </Suspense>
                     ))}
                   </div>
                   {hasMore && (
-                    <button
+                    <motion.button
                       onClick={loadMore}
                       disabled={isLoading}
                       className="mt-6 px-4 py-2 bg-[#3B82F6] text-[#FFFFFF] rounded-lg block mx-auto"
+                      whileHover="hover"
+                      variants={buttonVariants}
                     >
                       {isLoading ? 'Cargando más...' : 'Cargar más'}
-                    </button>
+                    </motion.button>
                   )}
                 </>
               ) : (

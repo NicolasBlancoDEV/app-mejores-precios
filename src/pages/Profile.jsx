@@ -1,25 +1,53 @@
-import { useContext, useState } from 'react';
-import { ProductContext } from '../context/ProductContext';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { db } from '../../firebase';
-import { collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Calendar from 'react-calendar';
-import 'react-calendar/dist/Calendar.css'; // Estilos por defecto del calendario
+import 'react-calendar/dist/Calendar.css';
 
 function Profile() {
-  const { purchases = [] } = useContext(ProductContext);
+  const [userData, setUserData] = useState(null);
   const [filter, setFilter] = useState('all');
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const navigate = useNavigate();
+
+  // Verificar autenticación y obtener datos del usuario
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          setUserData(userSnap.data());
+        } else {
+          const initialData = {
+            uid: user.uid,
+            email: user.email,
+            cart: [],
+            purchases: [],
+            stats: { totalSpent: 0, totalPurchases: 0, favoriteCategory: '' }
+          };
+          await setDoc(userRef, initialData);
+          setUserData(initialData);
+        }
+      } else {
+        navigate('/login');
+      }
+    });
+    return () => unsubscribe();
+  }, [navigate]);
 
   // Calcular gastos por día
   const getDailySpending = (date) => {
+    if (!userData || !userData.purchases) return 0;
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    return purchases
+    return userData.purchases
       .filter((purchase) => {
         const purchaseDate = new Date(purchase.date);
         return purchaseDate >= startOfDay && purchaseDate <= endOfDay;
@@ -29,14 +57,15 @@ function Profile() {
 
   // Calcular gastos por semana
   const getWeeklySpending = (date) => {
+    if (!userData || !userData.purchases) return 0;
     const startOfWeek = new Date(date);
-    startOfWeek.setDate(date.getDate() - date.getDay()); // Primer día de la semana (domingo)
+    startOfWeek.setDate(date.getDate() - date.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
     const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6); // Último día de la semana (sábado)
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
 
-    return purchases
+    return userData.purchases
       .filter((purchase) => {
         const purchaseDate = new Date(purchase.date);
         return purchaseDate >= startOfWeek && purchaseDate <= endOfWeek;
@@ -46,12 +75,13 @@ function Profile() {
 
   // Calcular gastos por mes
   const getMonthlySpending = (date) => {
+    if (!userData || !userData.purchases) return 0;
     const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
     startOfMonth.setHours(0, 0, 0, 0);
     const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
     endOfMonth.setHours(23, 59, 59, 999);
 
-    return purchases
+    return userData.purchases
       .filter((purchase) => {
         const purchaseDate = new Date(purchase.date);
         return purchaseDate >= startOfMonth && purchaseDate <= endOfMonth;
@@ -66,10 +96,10 @@ function Profile() {
 
   // Filtrar compras según el filtro seleccionado
   const getFilteredPurchases = () => {
-    if (!purchases || purchases.length === 0) return [];
+    if (!userData || !userData.purchases || userData.purchases.length === 0) return [];
 
     const now = new Date();
-    return purchases.filter((purchase) => {
+    return userData.purchases.filter((purchase) => {
       const purchaseDate = new Date(purchase.date);
       if (filter === 'day') {
         return purchaseDate.toDateString() === now.toDateString();
@@ -90,13 +120,20 @@ function Profile() {
   // Función para borrar el historial
   const resetPurchases = async () => {
     try {
-      const snapshot = await getDocs(collection(db, 'purchases'));
-      await Promise.all(snapshot.docs.map((d) => deleteDoc(d.ref)));
+      const updatedUserData = {
+        ...userData,
+        purchases: [],
+        stats: { totalSpent: 0, totalPurchases: 0, favoriteCategory: '' },
+      };
+      await setDoc(doc(db, 'users', auth.currentUser.uid), updatedUserData);
+      setUserData(updatedUserData);
       toast.success('Historial borrado');
     } catch (error) {
       toast.error('Error: ' + error.message);
     }
   };
+
+  if (!userData) return <div className="text-center py-8 text-[#FFFFFF]">Cargando...</div>;
 
   return (
     <motion.div
@@ -108,7 +145,7 @@ function Profile() {
         className="text-2xl font-bold mb-6 text-[#FFFFFF] text-center"
         style={{ fontFamily: "'Poppins', sans-serif" }}
       >
-        Mi Perfil
+        Perfil de {userData.email}
       </h1>
 
       {/* Calendario */}
@@ -139,6 +176,22 @@ function Profile() {
         </p>
         <p className="text-[#A0AEC0] text-center">
           Mes: ${monthlySpending.toFixed(2)}
+        </p>
+      </div>
+
+      {/* Estadísticas generales */}
+      <div className="bg-[#1F252A] rounded-lg shadow-md p-4 border-2 border-[#3A4450] max-w-sm mx-auto mb-6">
+        <h3 className="text-lg font-semibold text-[#FFFFFF] mb-2 text-center">
+          Estadísticas Generales
+        </h3>
+        <p className="text-[#A0AEC0] text-center">
+          Total Gastado: ${(userData.stats?.totalSpent || 0).toFixed(2)}
+        </p>
+        <p className="text-[#A0AEC0] text-center">
+          Total de Compras: {userData.stats?.totalPurchases || 0}
+        </p>
+        <p className="text-[#A0AEC0] text-center">
+          Categoría Favorita: {userData.stats?.favoriteCategory || 'Ninguna'}
         </p>
       </div>
 

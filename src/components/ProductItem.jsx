@@ -1,39 +1,100 @@
-import React from 'react';
-import { format } from 'date-fns';
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { auth, db } from '../firebase';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 
-const ProductItem = React.memo(({ product, index, cheapestProducts, addToCart }) => {
-  const isCheapest =
-    cheapestProducts[product.name.toLowerCase()] &&
-    cheapestProducts[product.name.toLowerCase()].id === product.id;
+// Variantes para animaciones
+const hoverVariants = {
+  hover: { scale: 1.05, transition: { duration: 0.3 } },
+};
+
+const ProductItem = ({ product }) => {
+  const [user, setUser] = useState(null);
+  const navigate = useNavigate();
+
+  // Verificar si el usuario está autenticado
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Función para agregar el producto al carrito
+  const handleAddToCart = async () => {
+    if (!user) {
+      toast.error('Por favor, inicia sesión para agregar productos al carrito');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+
+      let userData;
+      if (userSnap.exists()) {
+        userData = userSnap.data();
+      } else {
+        // Si el documento no existe, lo creamos
+        userData = {
+          uid: user.uid,
+          email: user.email,
+          cart: [],
+          purchases: [],
+          stats: { totalSpent: 0, totalPurchases: 0, favoriteCategory: '' }
+        };
+        await setDoc(userRef, userData);
+      }
+
+      const cart = userData.cart || [];
+      const existingItem = cart.find((item) => item.id === product.id);
+
+      if (existingItem) {
+        existingItem.quantity = (existingItem.quantity || 1) + 1;
+      } else {
+        cart.push({
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          store: product.store || 'Sin tienda',
+          quantity: 1,
+          savings: product.savings || 0,
+          category: product.category || 'Sin categoría',
+        });
+      }
+
+      await updateDoc(userRef, { cart });
+      toast.success(`${product.name} agregado al carrito`);
+    } catch (error) {
+      toast.error('Error al agregar al carrito: ' + error.message);
+    }
+  };
 
   return (
-    <div className="p-4 break-inside-avoid">
-      <div
-        className="text-[#FFFFFF] p-4 text-center rounded-lg backdrop-filter backdrop-blur-sm bg-opacity-10 bg-gray-800"
-        style={{
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-        }}
-      >
-        <h3 className="font-bold text-[#FFFFFF] text-lg">{product.name}</h3>
-        <p className="text-[#FFFFFF]">Precio: ${product.price.toFixed(2)}</p>
-        <p className="text-[#FFFFFF]">Tienda: {product.store}</p>
-        <p className="text-[#FFFFFF]">
-          Fecha de Carga: {product.uploadDate ? format(new Date(product.uploadDate), 'dd/MM/yyyy') : 'N/A'}
-        </p>
-        {isCheapest && (
-          <p className="text-[#34C759] font-semibold mt-2">
-            Mejor Precio
-          </p>
-        )}
-        <button
-          onClick={() => addToCart(product)}
-          className="mt-4 px-4 py-2 bg-[#3984fc] text-[#FFFFFF] rounded-lg"
+    <motion.div
+      className="bg-[#1F252A] p-4 rounded-lg shadow border-2 border-[#3A4450] w-full max-w-sm"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      whileHover="hover"
+      variants={hoverVariants}
+    >
+      <div className="text-center">
+        <h3 className="font-bold text-[#FFFFFF]">{product.name}</h3>
+        <p className="text-[#A0AEC0]">Precio: ${product.price?.toFixed(2)}</p>
+        {product.store && <p className="text-[#A0AEC0]">Tienda: {product.store}</p>}
+        <motion.button
+          onClick={handleAddToCart}
+          className="mt-2 px-4 py-2 bg-blue-500 text-[#FFFFFF] rounded-lg"
+          whileHover={{ scale: 1.05 }}
         >
           Agregar al Carrito
-        </button>
+        </motion.button>
       </div>
-    </div>
+    </motion.div>
   );
-});
+};
 
 export default ProductItem;

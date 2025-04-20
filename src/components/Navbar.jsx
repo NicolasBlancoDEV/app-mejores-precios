@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FaHome, FaPlus, FaBars, FaTimes, FaShoppingCart, FaSearch, FaUser, FaSignOutAlt } from 'react-icons/fa';
-import { auth } from '../firebase'; // Importamos Firebase auth
+import { auth } from '../firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 // Variantes para el efecto Float de los íconos
@@ -30,25 +30,23 @@ const linkVariants = {
 
 function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const [user, setUser] = useState(null); // Estado para el usuario autenticado
+  const [user, setUser] = useState(null);
   const navigate = useNavigate();
 
-  // Escuchar cambios en el estado de autenticación
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser); // Actualizamos el estado del usuario
+      setUser(currentUser);
     });
     return () => unsubscribe();
   }, []);
 
   const toggleMenu = () => setIsOpen(!isOpen);
 
-  // Función para cerrar sesión
   const handleLogout = async () => {
     try {
       await signOut(auth);
       navigate('/login');
-      toggleMenu(); // Cerrar el menú en pantallas pequeñas
+      toggleMenu();
     } catch (err) {
       console.error('Error al cerrar sesión:', err);
     }
@@ -57,7 +55,6 @@ function Navbar() {
   return (
     <nav className="sticky top-0 z-50 bg-transparent">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center bg-transparent">
-        {/* Ícono principal con efecto Float */}
         <Link to="/">
           <motion.div
             className="text-2xl font-bold text-white p-2 rounded-full shadow-soft"
@@ -68,7 +65,6 @@ function Navbar() {
           </motion.div>
         </Link>
 
-        {/* Enlaces para pantallas grandes */}
         <div className="hidden md:flex space-x-6 items-center">
           <Link to="/">
             <motion.div
@@ -95,15 +91,6 @@ function Navbar() {
               variants={linkVariants}
             >
               <FaSearch className="mr-1 text-purple-400" /> Buscar Mejor Precio
-            </motion.div>
-          </Link>
-          <Link to="/savings">
-            <motion.div
-              className="flex items-center text-white"
-              whileHover="hover"
-              variants={linkVariants}
-            >
-              <FaHome className="mr-1 text-teal-400" /> Mejores Precios
             </motion.div>
           </Link>
           <Link to="/cart">
@@ -159,7 +146,6 @@ function Navbar() {
           )}
         </div>
 
-        {/* Botón del menú hamburguesa con efecto Float */}
         <motion.button
           className="md:hidden text-white p-2 rounded-lg shadow-soft"
           variants={floatVariants}
@@ -171,7 +157,6 @@ function Navbar() {
         </motion.button>
       </div>
 
-      {/* Menú desplegable para pantallas pequeñas */}
       <motion.div
         className="md:hidden overflow-hidden bg-transparent"
         initial="hidden"
@@ -204,15 +189,6 @@ function Navbar() {
               variants={linkVariants}
             >
               <FaSearch className="mr-2 text-purple-400" /> Buscar Mejor Precio
-            </motion.div>
-          </Link>
-          <Link to="/savings" onClick={toggleMenu}>
-            <motion.div
-              className="flex items-center text-white"
-              whileHover="hover"
-              variants={linkVariants}
-            >
-              <FaHome className="mr-2 text-teal-400" /> Mejores Precios
             </motion.div>
           </Link>
           <Link to="/cart" onClick={toggleMenu}>

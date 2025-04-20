@@ -1,187 +1,133 @@
-import { useContext } from 'react';
-import { ProductContext } from '../context/ProductContext';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { auth, db } from '../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 
 function Cart() {
-  const { cart, removeFromCart, products, closePurchase } = useContext(ProductContext);
+  const [userData, setUserData] = useState(null);
   const navigate = useNavigate();
 
-  // Agrupar productos por nombre para calcular ahorros
-  const groupedProducts = products.reduce((acc, product) => {
-    const name = product.name.toLowerCase();
-    if (!acc[name]) acc[name] = [];
-    acc[name].push(product);
-    return acc;
-  }, {});
+  // Verificar autenticación y obtener datos del usuario
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          setUserData(userSnap.data());
+        } else {
+          const initialData = {
+            uid: user.uid,
+            email: user.email,
+            cart: [],
+            purchases: [],
+            stats: { totalSpent: 0, totalPurchases: 0, favoriteCategory: '' }
+          };
+          await setDoc(userRef, initialData);
+          setUserData(initialData);
+        }
+      } else {
+        navigate('/login');
+      }
+    });
+    return () => unsubscribe();
+  }, [navigate]);
 
-  // Calcular ahorros por producto y totales
-  const cartWithSavings = cart.map((item) => {
-    const productsWithSameName = groupedProducts[item.name.toLowerCase()] || [];
-    const prices = productsWithSameName.map((p) => p.price);
-    const highestPrice = prices.length > 0 ? Math.max(...prices) : item.price;
-    const savingsPerUnit = highestPrice - item.price;
-    const quantity = item.quantity || 1;
-    const totalSavings = savingsPerUnit * quantity;
-    return {
-      ...item,
-      highestPrice,
-      savingsPerUnit,
-      totalSavings,
-    };
-  });
+  // Función para cerrar compra
+  const handleCheckout = async () => {
+    if (!userData || !userData.cart || userData.cart.length === 0) {
+      toast.error('El carrito está vacío');
+      return;
+    }
 
-  // Calcular total gastado y total ahorrado
-  const totalSpent = cartWithSavings.reduce(
-    (sum, item) => sum + item.price * (item.quantity || 1),
-    0
-  );
-  const totalSavings = cartWithSavings.reduce(
-    (sum, item) => sum + item.totalSavings,
-    0
-  );
+    try {
+      const totalSpent = userData.cart.reduce(
+        (sum, item) => sum + item.price * (item.quantity || 1),
+        0
+      );
+      const totalSavings = userData.cart.reduce(
+        (sum, item) => sum + (item.savings || 0),
+        0
+      );
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
+      const purchase = {
+        id: `compra-${Date.now()}`,
+        date: new Date().toISOString(),
+        totalSpent,
+        totalSavings,
+        items: userData.cart,
+      };
+
+      const updatedPurchases = [...(userData.purchases || []), purchase];
+      const updatedStats = {
+        totalSpent: (userData.stats?.totalSpent || 0) + totalSpent,
+        totalPurchases: (userData.stats?.totalPurchases || 0) + 1,
+        favoriteCategory: userData.cart[0]?.category || 'Sin categoría',
+      };
+
+      const updatedUserData = {
+        ...userData,
+        cart: [], // Vaciar el carrito
+        purchases: updatedPurchases,
+        stats: updatedStats,
+      };
+
+      await setDoc(doc(db, 'users', auth.currentUser.uid), updatedUserData);
+      setUserData(updatedUserData);
+      toast.success('Compra cerrada exitosamente');
+    } catch (error) {
+      toast.error('Error al cerrar la compra: ' + error.message);
+    }
   };
 
-  // Función para manejar el cierre de la compra y redirigir
-  const handleClosePurchase = async () => {
-    await closePurchase(); // Cerrar la compra
-    navigate('/profile'); // Redirigir al perfil
-  };
+  if (!userData) return <div className="text-center py-8 text-[#FFFFFF]">Cargando...</div>;
 
   return (
     <motion.div
-      className="container mx-auto p-4 pt-20 pb-8 px-6"
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
+      className="container mx-auto p-4 pt-20 pb-8"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
     >
       <h1
         className="text-2xl font-bold mb-6 text-[#FFFFFF] text-center"
         style={{ fontFamily: "'Poppins', sans-serif" }}
       >
-        Carrito
+        Mi Carrito
       </h1>
 
-      {cart.length === 0 ? (
-        <motion.p
-          className="text-center text-[#FFFFFF] py-8"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-        >
-          El carrito está vacío
-        </motion.p>
-      ) : (
-        <>
-          {/* Informe detallado de ahorros al principio */}
-          <motion.div
-            className="mb-6 p-4 bg-[#1F252A] rounded-lg shadow-md border-2 border-[#3A4450] mx-auto max-w-sm"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            <h2 className="text-xl font-semibold text-[#FFFFFF] text-center mb-4">
-              Informe de Ahorros
-            </h2>
-            {cartWithSavings.map((item) => (
-              <div key={item.id} className="mb-4">
-                <p className="text-[#FFFFFF] text-center">
-                  <span className="font-semibold">{item.name}</span> (x{item.quantity || 1})
-                </p>
-                <p className="text-[#FFFFFF] text-center">
-                  Precio elegido: ${item.price.toFixed(2)}
-                </p>
-                <p className="text-[#FFFFFF] text-center">
-                  Precio más alto: ${item.highestPrice.toFixed(2)}
-                </p>
-                {item.savingsPerUnit > 0 ? (
-                  <>
-                    <p className="text-[#34C759] text-center">
-                      Ahorro por unidad: ${item.savingsPerUnit.toFixed(2)}
-                    </p>
-                    <p className="text-[#34C759] text-center">
-                      Ahorro total: ${item.totalSavings.toFixed(2)}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-[#A0AEC0] text-center">
-                    No hay ahorro para este producto
-                  </p>
-                )}
-              </div>
-            ))}
-            <div className="border-t border-[#3A4450] pt-4 mt-4">
-              <p className="text-[#FFFFFF] text-center">
-                Total gastado: ${totalSpent.toFixed(2)}
-              </p>
-              <p className="text-[#34C759] text-center font-semibold">
-                Total ahorrado: ${totalSavings.toFixed(2)}
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Lista de productos en el carrito */}
-          <div className="grid grid-cols-1 gap-4 justify-items-center">
-            {cartWithSavings.map((item) => (
-              <motion.div
-                key={item.id}
-                className="bg-[#1F252A] rounded-lg shadow-md border-2 border-[#3A4450] p-4 w-full max-w-sm"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-              >
-                <div className="text-[#FFFFFF] text-center">
-                  <h3 className="font-bold text-[#FFFFFF]">{item.name}</h3>
-                  <p className="text-[#FFFFFF]">
-                    Precio unitario: ${item.price.toFixed(2)}
-                  </p>
-                  <p className="text-[#FFFFFF]">
-                    Cantidad: {item.quantity || 1}
-                  </p>
-                  <p className="text-[#FFFFFF]">
-                    Subtotal: ${(item.price * (item.quantity || 1)).toFixed(2)}
-                  </p>
-                  <p className="text-[#FFFFFF]">
-                    Tienda: {item.store}
-                  </p>
-                  {item.savingsPerUnit > 0 ? (
-                    <p className="text-[#34C759]">
-                      Ahorro por unidad: ${item.savingsPerUnit.toFixed(2)} (comprando a ${item.price.toFixed(2)} frente a ${item.highestPrice.toFixed(2)})
-                    </p>
-                  ) : (
-                    <p className="text-[#A0AEC0]">
-                      No hay ahorro para este producto
-                    </p>
-                  )}
-                  <button
-                    onClick={() => removeFromCart(item.id)}
-                    className="mt-2 px-4 py-2 bg-red-500 text-[#FFFFFF] rounded-lg"
-                  >
-                    Eliminar
-                  </button>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          {/* Botón para cerrar compra */}
-          <motion.div
-            className="mt-6 p-4 bg-[#1F252A] rounded-lg shadow-md border-2 border-[#3A4450] mx-auto max-w-sm"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            <button
-              onClick={handleClosePurchase}
-              className="w-full px-4 py-2 bg-[#3B82F6] text-[#FFFFFF] rounded-lg"
+      {/* Carrito */}
+      {userData.cart?.length > 0 ? (
+        <div className="space-y-6 flex flex-col items-center">
+          {userData.cart.map((item, index) => (
+            <motion.div
+              key={index}
+              className="bg-[#1F252A] p-4 rounded-lg shadow border-2 border-[#3A4450] w-full max-w-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
             >
-              Cerrar Compra
-            </button>
-          </motion.div>
-        </>
+              <div className="text-center">
+                <h3 className="font-bold text-[#FFFFFF]">{item.name}</h3>
+                <p className="text-[#A0AEC0]">
+                  Precio: ${item.price.toFixed(2)} x {item.quantity || 1}
+                </p>
+                {item.store && <p className="text-[#A0AEC0]">Tienda: {item.store}</p>}
+              </div>
+            </motion.div>
+          ))}
+          <motion.button
+            onClick={handleCheckout}
+            className="mt-4 px-4 py-2 bg-green-500 text-[#FFFFFF] rounded-lg"
+            whileHover={{ scale: 1.05 }}
+          >
+            Cerrar Compra
+          </motion.button>
+        </div>
+      ) : (
+        <div className="text-center py-8">
+          <p className="text-[#A0AEC0] text-center">Tu carrito está vacío.</p>
+        </div>
       )}
     </motion.div>
   );
