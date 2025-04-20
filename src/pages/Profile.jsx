@@ -1,289 +1,150 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { auth, db } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import Calendar from 'react-calendar';
-import 'react-calendar/dist/Calendar.css';
 
-function Profile() {
+// Variantes para animaciones
+const containerVariants = {
+  hidden: { opacity: 0, y: 50 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: (i) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.1, duration: 0.3 },
+  }),
+};
+
+const Profile = () => {
+  const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
-  const [filter, setFilter] = useState('all');
-  const [selectedDate, setSelectedDate] = useState(new Date());
   const navigate = useNavigate();
 
-  // Verificar autenticación y obtener datos del usuario
+  // Verificar si el usuario está autenticado
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (user) {
-        const userRef = doc(db, 'users', user.uid);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          setUserData(userSnap.data());
-        } else {
-          const initialData = {
-            uid: user.uid,
-            email: user.email,
-            cart: [],
-            purchases: [],
-            stats: { totalSpent: 0, totalPurchases: 0, favoriteCategory: '' }
-          };
-          await setDoc(userRef, initialData);
-          setUserData(initialData);
-        }
-      } else {
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      setUser(currentUser);
+      if (!currentUser) {
+        toast.error('Por favor, inicia sesión para ver tu perfil');
         navigate('/login');
       }
     });
     return () => unsubscribe();
   }, [navigate]);
 
-  // Calcular gastos por día
-  const getDailySpending = (date) => {
-    if (!userData || !userData.purchases) return 0;
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+  // Escuchar cambios en los datos del usuario en Firestore
+  useEffect(() => {
+    if (!user) return;
 
-    return userData.purchases
-      .filter((purchase) => {
-        const purchaseDate = new Date(purchase.date);
-        return purchaseDate >= startOfDay && purchaseDate <= endOfDay;
-      })
-      .reduce((sum, purchase) => sum + purchase.totalSpent, 0);
-  };
-
-  // Calcular gastos por semana
-  const getWeeklySpending = (date) => {
-    if (!userData || !userData.purchases) return 0;
-    const startOfWeek = new Date(date);
-    startOfWeek.setDate(date.getDate() - date.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6);
-    endOfWeek.setHours(23, 59, 59, 999);
-
-    return userData.purchases
-      .filter((purchase) => {
-        const purchaseDate = new Date(purchase.date);
-        return purchaseDate >= startOfWeek && purchaseDate <= endOfWeek;
-      })
-      .reduce((sum, purchase) => sum + purchase.totalSpent, 0);
-  };
-
-  // Calcular gastos por mes
-  const getMonthlySpending = (date) => {
-    if (!userData || !userData.purchases) return 0;
-    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-    startOfMonth.setHours(0, 0, 0, 0);
-    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-    endOfMonth.setHours(23, 59, 59, 999);
-
-    return userData.purchases
-      .filter((purchase) => {
-        const purchaseDate = new Date(purchase.date);
-        return purchaseDate >= startOfMonth && purchaseDate <= endOfMonth;
-      })
-      .reduce((sum, purchase) => sum + purchase.totalSpent, 0);
-  };
-
-  // Gastos para la fecha seleccionada
-  const dailySpending = getDailySpending(selectedDate);
-  const weeklySpending = getWeeklySpending(selectedDate);
-  const monthlySpending = getMonthlySpending(selectedDate);
-
-  // Filtrar compras según el filtro seleccionado
-  const getFilteredPurchases = () => {
-    if (!userData || !userData.purchases || userData.purchases.length === 0) return [];
-
-    const now = new Date();
-    return userData.purchases.filter((purchase) => {
-      const purchaseDate = new Date(purchase.date);
-      if (filter === 'day') {
-        return purchaseDate.toDateString() === now.toDateString();
-      } else if (filter === 'week') {
-        const oneWeekAgo = new Date();
-        oneWeekAgo.setDate(now.getDate() - 7);
-        return purchaseDate >= oneWeekAgo;
-      } else if (filter === 'month') {
-        return (
-          purchaseDate.getMonth() === now.getMonth() &&
-          purchaseDate.getFullYear() === now.getFullYear()
-        );
+    const userRef = doc(db, 'users', user.uid);
+    const unsubscribe = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setUserData(docSnap.data());
+      } else {
+        toast.error('No se encontraron datos del usuario');
       }
-      return true;
+    }, (error) => {
+      console.error('Error al cargar los datos del usuario:', error);
+      toast.error('Error al cargar los datos del usuario: ' + error.message);
     });
-  };
 
-  // Función para borrar el historial
-  const resetPurchases = async () => {
-    try {
-      const updatedUserData = {
-        ...userData,
-        purchases: [],
-        stats: { totalSpent: 0, totalPurchases: 0, favoriteCategory: '' },
-      };
-      await setDoc(doc(db, 'users', auth.currentUser.uid), updatedUserData);
-      setUserData(updatedUserData);
-      toast.success('Historial borrado');
-    } catch (error) {
-      toast.error('Error: ' + error.message);
-    }
-  };
+    return () => unsubscribe();
+  }, [user]);
 
-  if (!userData) return <div className="text-center py-8 text-[#FFFFFF]">Cargando...</div>;
+  if (!userData) {
+    return (
+      <div className="min-h-screen bg-gray-800 flex items-center justify-center">
+        <p className="text-white text-lg">Cargando...</p>
+      </div>
+    );
+  }
 
   return (
-    <motion.div
-      className="container mx-auto p-4 pt-20 pb-8"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-    >
-      <h1
-        className="text-2xl font-bold mb-6 text-[#FFFFFF] text-center"
-        style={{ fontFamily: "'Poppins', sans-serif" }}
+    <div className="min-h-screen bg-gray-800 py-8 px-6">
+      <motion.div
+        className="max-w-4xl mx-auto"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
       >
-        Perfil de {userData.email}
-      </h1>
+        <h1 className="text-3xl font-bold text-white text-center mb-6">Mi Perfil</h1>
 
-      {/* Calendario */}
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold text-[#FFFFFF] text-center mb-4">
-          Registro de Gastos
-        </h2>
-        <div className="flex justify-center">
-          <Calendar
-            onChange={setSelectedDate}
-            value={selectedDate}
-            className="bg-[#1F252A] text-[#FFFFFF] rounded-lg border-2 border-[#3A4450] shadow-md"
-            tileClassName="text-[#FFFFFF]"
-          />
+        {/* Estadísticas */}
+        <div className="bg-gray-700 p-6 rounded-lg mb-6">
+          <h2 className="text-2xl font-bold text-white mb-4">Estadísticas de Compras</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-gray-600 p-4 rounded-lg">
+              <p className="text-gray-300">Total Gastado</p>
+              <p className="text-white text-xl font-bold">
+                ${userData.stats?.totalSpent?.toFixed(2) || 0}
+              </p>
+            </div>
+            <div className="bg-gray-600 p-4 rounded-lg">
+              <p className="text-gray-300">Total de Compras</p>
+              <p className="text-white text-xl font-bold">
+                {userData.stats?.totalPurchases || 0}
+              </p>
+            </div>
+            <div className="bg-gray-600 p-4 rounded-lg">
+              <p className="text-gray-300">Categoría Favorita</p>
+              <p className="text-white text-xl font-bold">
+                {userData.stats?.favoriteCategory || 'Ninguna'}
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Resumen de gastos */}
-      <div className="bg-[#1F252A] rounded-lg shadow-md p-4 border-2 border-[#3A4450] max-w-sm mx-auto mb-6">
-        <h3 className="text-lg font-semibold text-[#FFFFFF] mb-2 text-center">
-          Gastos para {selectedDate.toLocaleDateString()}
-        </h3>
-        <p className="text-[#A0AEC0] text-center">
-          Día: ${dailySpending.toFixed(2)}
-        </p>
-        <p className="text-[#A0AEC0] text-center">
-          Semana: ${weeklySpending.toFixed(2)}
-        </p>
-        <p className="text-[#A0AEC0] text-center">
-          Mes: ${monthlySpending.toFixed(2)}
-        </p>
-      </div>
-
-      {/* Estadísticas generales */}
-      <div className="bg-[#1F252A] rounded-lg shadow-md p-4 border-2 border-[#3A4450] max-w-sm mx-auto mb-6">
-        <h3 className="text-lg font-semibold text-[#FFFFFF] mb-2 text-center">
-          Estadísticas Generales
-        </h3>
-        <p className="text-[#A0AEC0] text-center">
-          Total Gastado: ${(userData.stats?.totalSpent || 0).toFixed(2)}
-        </p>
-        <p className="text-[#A0AEC0] text-center">
-          Total de Compras: {userData.stats?.totalPurchases || 0}
-        </p>
-        <p className="text-[#A0AEC0] text-center">
-          Categoría Favorita: {userData.stats?.favoriteCategory || 'Ninguna'}
-        </p>
-      </div>
-
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-4 my-6 justify-center">
-        <motion.button
-          onClick={() => setFilter('day')}
-          className={`px-4 py-2 rounded-lg ${
-            filter === 'day' ? 'bg-[#3B82F6] text-[#FFFFFF]' : 'bg-[#2D333B] text-[#A0AEC0]'
-          }`}
-          whileHover={{ scale: 1.05 }}
-        >
-          Hoy
-        </motion.button>
-        <motion.button
-          onClick={() => setFilter('week')}
-          className={`px-4 py-2 rounded-lg ${
-            filter === 'week' ? 'bg-[#3B82F6] text-[#FFFFFF]' : 'bg-[#2D333B] text-[#A0AEC0]'
-          }`}
-          whileHover={{ scale: 1.05 }}
-        >
-          Esta semana
-        </motion.button>
-        <motion.button
-          onClick={() => setFilter('month')}
-          className={`px-4 py-2 rounded-lg ${
-            filter === 'month' ? 'bg-[#3B82F6] text-[#FFFFFF]' : 'bg-[#2D333B] text-[#A0AEC0]'
-          }`}
-          whileHover={{ scale: 1.05 }}
-        >
-          Este mes
-        </motion.button>
-        <motion.button
-          onClick={() => setFilter('all')}
-          className={`px-4 py-2 rounded-lg ${
-            filter === 'all' ? 'bg-[#3B82F6] text-[#FFFFFF]' : 'bg-[#2D333B] text-[#A0AEC0]'
-          }`}
-          whileHover={{ scale: 1.05 }}
-        >
-          Todos
-        </motion.button>
-      </div>
-
-      {/* Lista de compras filtradas */}
-      {getFilteredPurchases().length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-[#A0AEC0] text-center">No hay compras registradas</p>
+        {/* Historial de Compras */}
+        <div className="bg-gray-700 p-6 rounded-lg">
+          <h2 className="text-2xl font-bold text-white mb-4">Historial de Compras</h2>
+          {userData.purchases?.length > 0 ? (
+            <div className="space-y-4">
+              {userData.purchases.map((purchase, index) => (
+                <motion.div
+                  key={index}
+                  className="bg-gray-600 p-4 rounded-lg"
+                  variants={itemVariants}
+                  initial="hidden"
+                  animate="visible"
+                  custom={index}
+                >
+                  <p className="text-gray-300">
+                    Fecha:{' '}
+                    {new Date(purchase.date).toLocaleDateString('es-ES', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </p>
+                  <p className="text-gray-300">
+                    Total Gastado: ${purchase.totalSpent.toFixed(2)}
+                  </p>
+                  <div className="mt-2">
+                    <p className="text-gray-300">Productos:</p>
+                    <ul className="list-disc list-inside text-white">
+                      {purchase.items.map((item, itemIndex) => (
+                        <li key={itemIndex}>
+                          {item.name} - Cantidad: {item.quantity} - Precio: $
+                          {item.price.toFixed(2)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-300">No tienes compras registradas.</p>
+          )}
         </div>
-      ) : (
-        <div className="space-y-6 flex flex-col items-center">
-          {getFilteredPurchases().map((purchase) => (
-            <motion.div
-              key={purchase.id}
-              className="bg-[#1F252A] p-4 rounded-lg shadow border-2 border-[#3A4450] w-full max-w-sm"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              <div className="text-center">
-                <h3 className="font-bold text-[#FFFFFF]">
-                  Compra del {new Date(purchase.date).toLocaleDateString()}
-                </h3>
-                <p className="text-[#FFFFFF]">
-                  Total gastado: ${purchase.totalSpent.toFixed(2)}
-                </p>
-                <p className="text-[#FFFFFF]">
-                  Ahorro: ${purchase.totalSavings.toFixed(2)}
-                </p>
-                <ul className="mt-2">
-                  {purchase.items.map((item, i) => (
-                    <li key={i} className="text-[#A0AEC0]">
-                      {item.name} (x{item.quantity || 1}) - ${item.price.toFixed(2)} ({item.store})
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      )}
-
-      {/* Botón para borrar historial */}
-      <div className="flex justify-center">
-        <motion.button
-          onClick={resetPurchases}
-          className="mt-6 px-4 py-2 bg-red-500 text-[#FFFFFF] rounded-lg"
-          whileHover={{ scale: 1.05 }}
-        >
-          Borrar historial
-        </motion.button>
-      </div>
-    </motion.div>
+      </motion.div>
+    </div>
   );
-}
+};
 
 export default Profile;

@@ -76,6 +76,7 @@ const Cart = () => {
     }
 
     try {
+      console.log('Iniciando cierre de compra...'); // Log para depuración
       const userRef = doc(db, 'users', user.uid);
       const userSnap = await getDoc(userRef);
       const userData = userSnap.data();
@@ -117,6 +118,7 @@ const Cart = () => {
         stats: updatedStats,
       });
 
+      console.log('Compra cerrada exitosamente'); // Log para depuración
       toast.success('¡Compra realizada! Visita tu perfil para ver las estadísticas de tus compras.', {
         onClick: () => navigate('/profile'),
       });
