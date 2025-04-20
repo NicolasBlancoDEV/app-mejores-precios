@@ -233,30 +233,42 @@ function Home() {
               </h2>
               {displayedProducts.length > 0 ? (
                 <>
-                  <div className="space-y-6">
+                  <div className="space-y-6 lg:grid lg:grid-cols-4 lg:gap-6 lg:space-y-0">
                     {displayedProducts.map((product, index) => {
                       const isCheapest = cheapestProductsMap[product.name.toLowerCase()]?.id === product.id;
+                      const isLastInRow = (index + 1) % 4 === 0; // Calcula si es el último producto de la fila (4 columnas)
                       return (
                         <Suspense key={product.id} fallback={<div>Cargando producto...</div>}>
-                          <motion.div
-                            custom={index}
-                            variants={productVariants}
-                            initial="hidden"
-                            animate="visible"
-                            className="relative flex flex-col items-center"
-                          >
-                            {isCheapest && (
-                              <div className="absolute top-0 left-0 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded">
-                                Mejor Precio
-                              </div>
-                            )}
-                            <div
-                              className={`w-full max-w-md ${isCheapest ? 'bg-green-500/20 border-transparent rounded-lg p-4' : ''}`}
+                          <div className="flex flex-col items-center lg:flex-row lg:items-center">
+                            <motion.div
+                              custom={index}
+                              variants={productVariants}
+                              initial="hidden"
+                              animate="visible"
+                              className="relative flex flex-col items-center min-w-0"
                             >
-                              <ProductItem product={product} />
-                            </div>
-                            <hr className="w-1/2 mx-auto border-t border-[#3A4450] my-4" />
-                          </motion.div>
+                              <div
+                                className={`w-full ${isCheapest ? 'bg-green-500/20 border-transparent rounded-lg p-4' : ''}`}
+                              >
+                                {isCheapest && (
+                                  <div className="text-center mb-2">
+                                    <span className="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded">
+                                      Mejor Precio
+                                    </span>
+                                  </div>
+                                )}
+                                <ProductItem product={product} />
+                              </div>
+                            </motion.div>
+                            {/* Línea vertical en pantallas grandes */}
+                            {!isLastInRow && (
+                              <div className="hidden lg:block h-16 border-l border-[#3A4450] mx-3 self-center" />
+                            )}
+                            {/* Línea horizontal en móviles */}
+                            {index < displayedProducts.length - 1 && (
+                              <hr className="w-1/2 mx-auto border-t border-[#3A4450] my-4 lg:hidden" />
+                            )}
+                          </div>
                         </Suspense>
                       );
                     })}
