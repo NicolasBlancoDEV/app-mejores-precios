@@ -4,6 +4,8 @@ import { db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import ProductItem from '../components/ProductItem';
 import { toast } from 'react-toastify';
+import { useCart } from '../context/CartContext';
+import { useNavigate } from 'react-router-dom';
 
 // Variantes para animaciones
 const containerVariants = {
@@ -14,6 +16,8 @@ const containerVariants = {
 const Home = () => {
   const [products, setProducts] = useState([]);
   const [bestPriceMap, setBestPriceMap] = useState({});
+  const { addToCart } = useCart();
+  const navigate = useNavigate();
 
   // Cargar productos desde Firestore y ordenarlos por fecha
   useEffect(() => {
@@ -64,6 +68,14 @@ const Home = () => {
     calculateBestPrice();
   }, [products]);
 
+  // Función para agregar un producto al carrito
+  const handleAddToCart = async (product) => {
+    const success = await addToCart(product);
+    if (!success) {
+      navigate('/login');
+    }
+  };
+
   // Determinar si un producto tiene el mejor precio
   const isBestPrice = (product) => {
     const name = product.name.toLowerCase();
@@ -92,7 +104,7 @@ const Home = () => {
                 animate="visible"
                 custom={index}
               >
-                <ProductItem product={product} />
+                <ProductItem product={product} handleAddToCart={handleAddToCart} />
               </motion.div>
             ))}
           </div>
